@@ -4,6 +4,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List
 from app.db import get_session, init_db
 from app.models import Song, SongCreate
+from fastapi import HTTPException
+
 
 app = FastAPI()
 
@@ -26,7 +28,7 @@ async def get_song(song_id: int, session: AsyncSession = Depends(get_session)):
     song = await session.get(Song, song_id)
     if song:
         return Song(name=song.name, artist=song.artist, year=song.year, id=song.id)
-    return {"message": "Song not found"}, 404
+    raise HTTPException(status_code=404, detail="Song not found")
 
 @app.post("/songs")
 async def add_songs(songs: List[SongCreate], session: AsyncSession = Depends(get_session)):

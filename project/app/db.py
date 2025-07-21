@@ -1,24 +1,25 @@
 import os
-
-from sqlmodel import SQLModel, create_engine
-from sqlmodel.ext.asyncio.session import AsyncSession, AsyncEngine
-
+from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+engine: AsyncEngine | None = None
+if DATABASE_URL:
+    engine = create_async_engine(DATABASE_URL, echo=True, future=True)
 
-engine = AsyncEngine(create_engine(DATABASE_URL, echo=True, future=True))
-
-async def init_db():
-    async with engine.begin() as conn:
-        # await conn.run_sync(SQLModel.metadata.drop_all)
-        await conn.run_sync(SQLModel.metadata.create_all)
-
+async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False) if engine else None
 
 async def get_session() -> AsyncSession:
-    async_session = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
+    if not async_session:
+        raise RuntimeError("async_session is not initialized. Possibly running in test mode without engine.")
     async with async_session() as session:
         yield session
+
+async def init_db():
+    if not engine:
+        raise RuntimeError("Engine not initialized.")
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
